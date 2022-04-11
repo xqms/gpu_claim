@@ -133,7 +133,7 @@ int main(int argc, char** argv)
             card.computeUsagePercent = util.gpu;
 
             unsigned int procCount = processBuf.size();
-            if(auto err = nvmlDeviceGetComputeRunningProcesses_v2(dev, &procCount, processBuf.data()))
+            if(auto err = nvmlDeviceGetComputeRunningProcesses(dev, &procCount, processBuf.data()))
             {
                 fprintf(stderr, "Could not get running processes: %s\n", nvmlErrorString(err));
                 procCount = 0;
@@ -158,7 +158,7 @@ int main(int argc, char** argv)
             }
 
             procCount = processBuf.size();
-            if(auto err = nvmlDeviceGetGraphicsRunningProcesses_v2(dev, &procCount, processBuf.data()))
+            if(auto err = nvmlDeviceGetGraphicsRunningProcesses(dev, &procCount, processBuf.data()))
             {
                 fprintf(stderr, "Could not get running processes: %s\n", nvmlErrorString(err));
                 procCount = 0;
