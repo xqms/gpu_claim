@@ -1,0 +1,3 @@
+[submodule "contrib/zpp_bits"]
+	path = contrib/zpp_bits
+	url = https://github.com/eyalz800/zpp_bits.git
