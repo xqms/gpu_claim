@@ -72,7 +72,7 @@ PriorityQueue g_jobQueue;
 std::size_t gpuLimitPerUser = 8;
 std::vector<Client*> deleteList;
 
-void claim(Card& card, int uid)
+void claim(Card& card, int uid, int gid=65534)
 {
     if(uid < 0)
         throw std::logic_error{"claim(): Invalid UID"};
@@ -80,7 +80,7 @@ void claim(Card& card, int uid)
     char buf[256];
     snprintf(buf, sizeof(buf), "/dev/nvidia%u", card.minorID);
 
-    if(chown(buf, uid, -1) != 0)
+    if(chown(buf, uid, gid) != 0)
     {
         fprintf(stderr, "Could not set owner of %s to UID %d: %s\n",
             buf, uid, strerror(errno)
@@ -98,7 +98,7 @@ void claim(Card& card, int uid)
 
 void release(Card& card)
 {
-    claim(card, 0);
+    claim(card, 0, 0);
 }
 
 void updateCardFromNVML(unsigned int devIdx, Card& card, const std::chrono::steady_clock::time_point& now = std::chrono::steady_clock::now())
