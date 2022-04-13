@@ -3,8 +3,8 @@ gpu_claim
 
 Very simple GPU job queuing system.
 
-Howto
------
+User HowTo
+----------
 
 Query the current state with `gpu`:
 
@@ -73,3 +73,18 @@ Type "help", "copyright", "credits" or "license" for more information.
 2
 >>>
 ```
+
+Admin HowTo
+-----------
+
+Installation is manual for now. You have to set the following options
+in e.g. `/etc/modprobe.d/nvidia_gpu_claim.conf`:
+
+```
+options nvidia NVreg_ModifyDeviceFiles=0 NVreg_DeviceFileMode=0660
+```
+
+Afterwards make sure that the `/dev/nvidia[0-9]` files are only accessible by
+owner and group.
+
+Run `gpu_server` as root.
