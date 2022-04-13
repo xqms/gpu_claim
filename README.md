@@ -8,7 +8,7 @@ Howto
 
 Query the current state with `gpu`:
 
-```
+```console
 $ gpu
 [0] NVIDIA TITAN X (Pascal) |  0% |     98 /  12884 MB |                  free |
 [1] NVIDIA TITAN X (Pascal) |  0% |     98 /  12884 MB |                  free |
@@ -18,14 +18,14 @@ $ gpu
 
 Run a job:
 
-```
+```console
 $ gpu run nvidia-smi -L
 GPU 0: NVIDIA TITAN X (Pascal) (UUID: GPU-05deeaa6-3899-bc94-5660-0f1a7d93f221)
 ```
 
 Run a job on two GPUs:
 
-```
+```console
 $ gpu -n 2 run nvidia-smi -L
 GPU 0: NVIDIA TITAN X (Pascal) (UUID: GPU-05deeaa6-3899-bc94-5660-0f1a7d93f221)
 GPU 1: NVIDIA TITAN X (Pascal) (UUID: GPU-92161328-5ab6-9b3f-042e-eee46ba5d7aa)
@@ -33,7 +33,7 @@ GPU 1: NVIDIA TITAN X (Pascal) (UUID: GPU-92161328-5ab6-9b3f-042e-eee46ba5d7aa)
 
 Run a singularity container with PyTorch:
 
-```
+```console
 $ singularity pull docker://nvcr.io/nvidia/pytorch:22.03-py3
 $ gpu -n 2 run singularity run --nv pytorch_22.03-py3.sif python
 
