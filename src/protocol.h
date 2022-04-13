@@ -20,6 +20,7 @@ struct Process
 
 struct Card
 {
+    unsigned int index = 0;
     unsigned int minorID = 0;
     std::string name;
     std::string uuid;
@@ -31,6 +32,15 @@ struct Card
     std::vector<Process> processes;
 
     std::chrono::steady_clock::time_point lastUsageTime;
+};
+
+struct Job
+{
+    std::int64_t uid = 0;
+    std::int64_t pid = 0;
+    std::int64_t numGPUs = 0;
+    float priority;
+    std::chrono::system_clock::time_point submissionTime;
 };
 
 struct StatusRequest
@@ -56,21 +66,20 @@ struct ReleaseRequest
 {
     std::vector<std::uint32_t> gpus;
 };
-
-
-
-struct Request
+struct ReleaseResponse
 {
-    // You can only append to this list. Never remove, otherwise you break
-    // protocol compatibility.
-    std::variant<StatusRequest, ClaimRequest, ReleaseRequest> data;
+    std::string errors;
 };
+
+using Request = std::variant<StatusRequest, ClaimRequest, ReleaseRequest>;
 
 namespace std
 {
 namespace chrono
 {
-constexpr auto serialize(auto& archive, std::chrono::steady_clock::time_point& tp)
+
+template<class Clock, class Dur>
+constexpr auto serialize(auto& archive, std::chrono::time_point<Clock, Dur>& tp)
 {
     using archive_type = std::remove_cvref_t<decltype(archive)>;
 
@@ -92,7 +101,8 @@ constexpr auto serialize(auto& archive, std::chrono::steady_clock::time_point& t
     }
 }
 
-constexpr auto serialize(auto& archive, const std::chrono::steady_clock::time_point& tp)
+template<class Clock, class Dur>
+constexpr auto serialize(auto& archive, const std::chrono::time_point<Clock, Dur>& tp)
 {
     using archive_type = std::remove_cvref_t<decltype(archive)>;
     static_assert(archive_type::kind() == zpp::bits::kind::out);

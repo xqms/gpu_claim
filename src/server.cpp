@@ -14,6 +14,7 @@
 #include <chrono>
 #include <memory>
 #include <ranges>
+#include <sstream>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -27,15 +28,49 @@
 #include <zpp_bits.h>
 
 #include "protocol.h"
-
-std::vector<Card> g_cards;
-std::size_t gpuLimitPerUser = 2;
+#include "priority_queue.h"
 
 namespace
 {
     template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
     template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 }
+
+struct Client
+{
+    int fd = -1;
+    std::chrono::steady_clock::time_point connectTime;
+    int uid = -1;
+    int pid = -1;
+    bool waitingOnQueue = false;
+
+    explicit Client(int fd);
+
+    ~Client()
+    {
+        printf("Closing connection to client %d (UID %d)\n", pid, uid);
+        if(fd >= 0)
+            close(fd);
+    };
+
+    // Return false if the client should be deleted
+    [[nodiscard]] bool communicate();
+
+    void send(auto&& msg)
+    {
+        auto [data, out] = zpp::bits::data_out();
+        out(msg).or_throw();
+
+        if(::send(fd, data.data(), data.size(), MSG_EOR) != data.size())
+            perror("Could not send response");
+    }
+};
+
+std::vector<Card> g_cards;
+std::vector<std::unique_ptr<Client>> g_clients;
+PriorityQueue g_jobQueue;
+std::size_t gpuLimitPerUser = 8;
+std::vector<Client*> deleteList;
 
 void claim(Card& card, int uid)
 {
@@ -53,6 +88,12 @@ void claim(Card& card, int uid)
         std::exit(1);
     }
     card.reservedByUID = uid;
+    card.lastUsageTime = std::chrono::steady_clock::now();
+
+    if(uid == 0)
+        printf("Card %d released.\n", card.index);
+    else
+        printf("Card %d claimed by UID %d.\n", card.index, uid);
 }
 
 void release(Card& card)
@@ -60,132 +101,7 @@ void release(Card& card)
     claim(card, 0);
 }
 
-struct Client
-{
-    int fd = -1;
-    std::chrono::steady_clock::time_point connectTime;
-    int uid = -1;
-
-    explicit Client(int fd)
-     : fd(fd)
-     , connectTime{std::chrono::steady_clock::now()}
-    {
-        ucred cred{};
-        socklen_t len = sizeof(cred);
-        if(getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cred, &len) != 0)
-        {
-            perror("Could not get SO_PEERCRED option");
-            return;
-        }
-
-        uid = cred.uid;
-    }
-
-    ~Client()
-    {
-        if(fd >= 0)
-            close(fd);
-    };
-
-    // Return false if the client should be deleted
-    [[nodiscard]] bool communicate()
-    {
-        // If authentication failed (see above), don't accept any commands.
-        if(uid < 0)
-            return false;
-
-        std::array<uint8_t, 512> buf;
-
-        int ret = read(fd, buf.data(), buf.size());
-        if(ret == 0)
-        {
-            // Client has closed connection
-            return false;
-        }
-        if(ret < 0)
-        {
-            perror("Could not read from client");
-            return false;
-        }
-
-        printf("Got data from client!\n");
-
-        zpp::bits::in in{buf};
-
-        Request req;
-        auto res = in(req);
-        if(zpp::bits::failure(res))
-        {
-            fprintf(stderr, "Client sent request that could not be parsed\n");
-            return false;
-        }
-
-        auto send = [&](auto& msg){
-            auto [data, out] = zpp::bits::data_out();
-            out(msg).or_throw();
-
-            if(::send(fd, data.data(), data.size(), MSG_EOR) != data.size())
-                perror("Could not send response");
-        };
-
-        return std::visit(overloaded {
-            [&](const StatusRequest&) {
-                printf("Status req\n");
-                StatusResponse resp;
-                resp.cards = g_cards;
-
-                send(resp);
-                return false;
-            },
-            [&](const ClaimRequest& req) {
-                // Never allow someone to claim all cards
-                int alreadyClaimed = std::ranges::count_if(g_cards, [=](auto& card) { return card.reservedByUID == uid; });
-                if(alreadyClaimed + req.numGPUs > gpuLimitPerUser)
-                {
-                    ClaimResponse resp;
-                    resp.error = "GPU per-user limit is reached";
-                    send(resp);
-                    return false;
-                }
-
-                // Can we immediately satisfy this request?
-                std::vector<int> freeCards;
-                for(std::size_t i = 0; i < g_cards.size(); ++i)
-                {
-                    auto& card = g_cards[i];
-                    if(card.reservedByUID == 0)
-                        freeCards.push_back(i);
-                }
-
-                if(req.numGPUs <= freeCards.size())
-                {
-                    ClaimResponse resp;
-                    for(unsigned int i = 0; i < req.numGPUs; ++i)
-                    {
-                        claim(g_cards[freeCards[i]], uid);
-                        resp.claimedCards.push_back(g_cards[freeCards[i]]);
-                    }
-                    send(resp);
-                }
-                else
-                {
-                    ClaimResponse resp;
-                    resp.error = "Waiting is not implemented yet";
-                    send(resp);
-                }
-
-                return false;
-            },
-            [&](auto) {
-                fprintf(stderr, "Unhandled command type\n");
-                return false;
-            },
-        }, req.data);
-    }
-};
-std::vector<std::unique_ptr<Client>> g_clients;
-
-void updateCardFromNVML(unsigned int devIdx, Card& card, const std::chrono::steady_clock::time_point& now)
+void updateCardFromNVML(unsigned int devIdx, Card& card, const std::chrono::steady_clock::time_point& now = std::chrono::steady_clock::now())
 {
     char buf[1024];
     std::array<nvmlProcessInfo_t, 128> processBuf;
@@ -285,7 +201,6 @@ void updateCardFromNVML(unsigned int devIdx, Card& card, const std::chrono::stea
         proc.uid = st.st_uid;
     }
 
-
     if(card.reservedByUID != 0)
     {
         for(auto& proc : card.processes)
@@ -295,6 +210,202 @@ void updateCardFromNVML(unsigned int devIdx, Card& card, const std::chrono::stea
         }
     }
 }
+
+void periodicUpdate()
+{
+    auto now = std::chrono::steady_clock::now();
+    for(unsigned int devIdx = 0; devIdx < g_cards.size(); ++devIdx)
+    {
+        auto& card = g_cards[devIdx];
+
+        updateCardFromNVML(devIdx, card, now);
+
+        using namespace std::chrono_literals;
+        if(card.reservedByUID && now - card.lastUsageTime > 5min)
+        {
+            printf("Returning card %u, no usage for long time\n", devIdx);
+            release(card);
+        }
+    }
+
+    for(auto& client : g_clients)
+    {
+        using namespace std::chrono_literals;
+        if(!client->waitingOnQueue && now - client->connectTime > 2s)
+            deleteList.push_back(client.get());
+    }
+
+    // Check if next jobs are feasible
+    g_jobQueue.update();
+    while(!g_jobQueue.empty())
+    {
+        const auto& job = g_jobQueue.front();
+        auto it = std::ranges::find_if(g_clients, [&](auto& client){
+            return client->pid == job.pid;
+        });
+        if(it == g_clients.end())
+            throw std::logic_error{"Job without client"};
+        auto& client = *it;
+
+        // Can we immediately satisfy this request?
+        std::vector<int> freeCards;
+        for(std::size_t i = 0; i < g_cards.size(); ++i)
+        {
+            auto& card = g_cards[i];
+            if(card.reservedByUID == 0)
+                freeCards.push_back(i);
+        }
+
+        // Never allow someone to claim all cards
+        int alreadyClaimed = std::ranges::count_if(g_cards, [=](auto& card) { return card.reservedByUID == job.uid; });
+        if(alreadyClaimed + job.numGPUs > gpuLimitPerUser)
+        {
+            printf("Sending per-user limit reached\n");
+            ClaimResponse resp;
+            resp.error = "GPU per-user limit is reached";
+            client->send(resp);
+            deleteList.push_back(client.get());
+        }
+
+        // Not feasible currently
+        if(job.numGPUs > freeCards.size())
+            break;
+
+        // Feasible!
+        printf("Starting job of client %ld\n", job.pid);
+        ClaimResponse resp;
+        for(unsigned int i = 0; i < job.numGPUs; ++i)
+        {
+            claim(g_cards[freeCards[i]], job.uid);
+            resp.claimedCards.push_back(g_cards[freeCards[i]]);
+        }
+        client->send(resp);
+        deleteList.push_back(client.get());
+
+        g_jobQueue.pop_front();
+    }
+}
+
+Client::Client(int fd)
+    : fd(fd)
+    , connectTime{std::chrono::steady_clock::now()}
+{
+    ucred cred{};
+    socklen_t len = sizeof(cred);
+    if(getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cred, &len) != 0)
+    {
+        perror("Could not get SO_PEERCRED option");
+        return;
+    }
+
+    uid = cred.uid;
+    pid = cred.pid;
+}
+
+// Return false if the client should be deleted
+[[nodiscard]] bool Client::communicate()
+{
+    // If authentication failed (see above), don't accept any commands.
+    if(uid < 0)
+        return false;
+
+    std::array<uint8_t, 512> buf;
+
+    int ret = read(fd, buf.data(), buf.size());
+    if(ret == 0)
+    {
+        // Client has closed connection
+        return false;
+    }
+    if(ret < 0)
+    {
+        perror("Could not read from client");
+        return false;
+    }
+
+    zpp::bits::in in{buf};
+
+    Request req;
+    auto res = in(req);
+    if(zpp::bits::failure(res))
+    {
+        fprintf(stderr, "Client sent request that could not be parsed\n");
+        return false;
+    }
+
+    return std::visit(overloaded {
+        [&](const StatusRequest&) {
+            StatusResponse resp;
+            resp.cards = g_cards;
+
+            send(resp);
+            return false;
+        },
+        [&](const ClaimRequest& req) {
+            if(req.numGPUs > gpuLimitPerUser)
+            {
+                ClaimResponse resp;
+                resp.error = "Your requested GPU count is over the per-user limit.";
+                send(resp);
+                return false;
+            }
+
+            Job job;
+            job.numGPUs = req.numGPUs;
+            job.pid = pid;
+            job.uid = uid;
+            g_jobQueue.enqueue(std::move(job));
+
+            periodicUpdate();
+
+            waitingOnQueue = true;
+            return true; // keep alive
+        },
+        [&](const ReleaseRequest& req) {
+            std::stringstream errors;
+            for(auto& cardIdx : req.gpus)
+            {
+                if(cardIdx >= g_cards.size())
+                {
+                    errors << "Invalid card index " << cardIdx << "\n";
+                    continue;
+                }
+
+                auto& card = g_cards[cardIdx];
+
+                updateCardFromNVML(cardIdx, card);
+
+                if(card.reservedByUID != uid)
+                {
+                    errors << "Card " << cardIdx << " is not reserved by user\n";
+                    continue;
+                }
+
+                auto it = std::ranges::find_if(card.processes, [&](const auto& proc){
+                    return proc.uid == uid;
+                });
+
+                if(it != card.processes.end())
+                {
+                    errors << "Card " << cardIdx << " is still in use. Maybe you want to kill the process with PID " << it->pid << "?\n";
+                    continue;
+                }
+
+                release(card);
+            }
+
+            send(ReleaseResponse{errors.str()});
+
+            return false;
+        },
+        [&](auto) {
+            fprintf(stderr, "Unhandled command type\n");
+            return false;
+        },
+    }, req);
+}
+
+
 
 int main(int argc, char** argv)
 {
@@ -357,6 +468,8 @@ int main(int argc, char** argv)
 
         auto& card = g_cards.emplace_back();
 
+        card.index = g_cards.size() - 1;
+
         if(auto err = nvmlDeviceGetName(dev, buf, sizeof(buf)))
         {
             fprintf(stderr, "Could not get device name: %s\n", nvmlErrorString(err));
@@ -378,6 +491,8 @@ int main(int argc, char** argv)
             return 1;
         }
         card.memoryTotal = mem.total;
+
+        card.lastUsageTime = std::chrono::steady_clock::now();
     }
 
     printf("Initialized with %lu cards.\n", g_cards.size());
@@ -441,8 +556,6 @@ int main(int argc, char** argv)
             return 1;
         }
 
-        std::vector<Client*> deleteList;
-
         for(int i = 0; i < nfds; ++i)
         {
             auto& ev = events[i];
@@ -488,28 +601,7 @@ int main(int argc, char** argv)
                     return 1;
                 }
 
-                auto now = std::chrono::steady_clock::now();
-
-                for(auto& client : g_clients)
-                {
-                    using namespace std::chrono_literals;
-                    if(now - client->connectTime > 2s)
-                        deleteList.push_back(client.get());
-                }
-
-                for(unsigned int devIdx = 0; devIdx < devices; ++devIdx)
-                {
-                    auto& card = g_cards[devIdx];
-
-                    updateCardFromNVML(devIdx, card, now);
-
-                    using namespace std::chrono_literals;
-                    if(card.reservedByUID && now - card.lastUsageTime > 5min)
-                    {
-                        printf("Returning card %u, no usage for long time\n", devIdx);
-                        release(card);
-                    }
-                }
+                periodicUpdate();
             }
             else
             {
@@ -517,7 +609,10 @@ int main(int argc, char** argv)
                 Client* client = reinterpret_cast<Client*>(ev.data.ptr);
 
                 if(!client->communicate())
+                {
+                    printf("Client::communicate() returned false\n");
                     deleteList.push_back(client);
+                }
             }
         }
 
@@ -536,8 +631,11 @@ int main(int argc, char** argv)
                 perror("Could not remove client from epoll list");
             }
 
+            g_jobQueue.remove(it->get()->pid);
+
             g_clients.erase(it);
         }
+        deleteList.clear();
     }
 
     nvmlShutdown();
