@@ -129,6 +129,7 @@ int main(int argc, char** argv)
     po::options_description desc{"Options"};
     desc.add_options()
         ("help,h", "Help")
+        ("version,v", "Display version")
         ("num-cards,n", po::value<unsigned int>()->default_value(1)->value_name("N"), "Number of GPUs to claim")
     ;
 
@@ -175,6 +176,14 @@ int main(int argc, char** argv)
             "Available options:\n"
         );
         std::cerr << desc << "\n";
+        return 1;
+    }
+
+    if(vm.count("version"))
+    {
+        fprintf(stderr, "gpu version: %d.%d.%d\n",
+            VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH
+        );
         return 1;
     }
 
