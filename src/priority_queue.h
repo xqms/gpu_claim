@@ -16,6 +16,8 @@ public:
     using std::deque<Job>::empty;
     using std::deque<Job>::front;
     using std::deque<Job>::pop_front;
+    using std::deque<Job>::begin;
+    using std::deque<Job>::end;
 
     void enqueue(Job&& job);
     void update();

@@ -242,6 +242,27 @@ int main(int argc, char** argv)
             }
             printf("\n");
         }
+
+        if(!resp.jobsInQueue.empty())
+        {
+            printf("\n");
+            printf("Waiting jobs:\n");
+            for(auto& job : resp.jobsInQueue)
+            {
+                struct passwd *pws;
+                pws = getpwuid(job.uid);
+
+                std::time_t t = std::chrono::system_clock::to_time_t(job.submissionTime);
+
+                std::stringstream ss;
+                ss << std::put_time(std::localtime(&t), "%F %R");
+
+                printf(" - %s %15s: %ld GPU(s)\n",
+                    ss.str().c_str(),
+                    pws->pw_name, job.numGPUs
+                );
+            }
+        }
     }
     else if(command == "claim")
     {

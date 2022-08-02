@@ -338,6 +338,10 @@ Client::Client(int fd)
             StatusResponse resp;
             resp.cards = g_cards;
 
+            resp.jobsInQueue.reserve(g_jobQueue.size());
+            for(const auto& job : g_jobQueue)
+                resp.jobsInQueue.push_back(job);
+
             send(resp);
             return false;
         },
@@ -354,6 +358,7 @@ Client::Client(int fd)
             job.numGPUs = req.numGPUs;
             job.pid = pid;
             job.uid = uid;
+            job.submissionTime = std::chrono::system_clock::now();
             g_jobQueue.enqueue(std::move(job));
 
             periodicUpdate();
@@ -409,6 +414,8 @@ Client::Client(int fd)
 
 int main(int argc, char** argv)
 {
+    std::setvbuf(stdout, nullptr, _IOLBF, BUFSIZ);
+
     int sock = socket(AF_UNIX, SOCK_SEQPACKET, 0);
     if(sock < 0)
     {

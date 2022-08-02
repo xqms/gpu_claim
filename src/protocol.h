@@ -49,6 +49,7 @@ struct StatusRequest
 struct StatusResponse
 {
     std::vector<Card> cards;
+    std::vector<Job> jobsInQueue;
 };
 
 struct ClaimRequest
@@ -90,7 +91,7 @@ constexpr auto serialize(auto& archive, std::chrono::time_point<Clock, Dur>& tp)
         if(zpp::bits::failure(res))
             return res;
 
-        tp = std::chrono::steady_clock::time_point{std::chrono::milliseconds{val}};
+        tp = std::chrono::time_point<Clock, Dur>{std::chrono::milliseconds{val}};
 
         return res;
     }
