@@ -54,6 +54,9 @@ install(TARGETS gpu_server
 install(FILES files/gpu_claim.conf
     DESTINATION /etc/modprobe.d/
 )
+install(FILES files/gpu_server.service
+    DESTINATION /lib/systemd/system/
+)
 
 set(CPACK_GENERATOR DEB)
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Max Schwarz <max.schwarz@ais.uni-bonn.de")
@@ -61,4 +64,5 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS "")
 set(CPACK_PACKAGE_VERSION_MAJOR ${VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${VERSION_PATCH})
+set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${CMAKE_CURRENT_SOURCE_DIR}/files/postinst;${CMAKE_CURRENT_SOURCE_DIR}/files/prerm")
 include(CPack)

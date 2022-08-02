@@ -1,0 +1,4 @@
+#!/bin/bash
+
+systemctl enable gpu_server.service
+systemctl start gpu_server.service

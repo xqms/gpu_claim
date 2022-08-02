@@ -1,0 +1,4 @@
+#!/bin/bash
+
+systemctl stop gpu_server.service
+systemctl disable gpu_server.service

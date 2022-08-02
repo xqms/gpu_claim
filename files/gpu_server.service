@@ -1,0 +1,11 @@
+[Unit]
+Description=gpu_claim server
+Wants=syslog.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/sbin/gpu_server
+
+[Install]
+WantedBy=multi-user.target
