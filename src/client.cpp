@@ -334,7 +334,7 @@ int main(int argc, char** argv)
             bool hadToWait = false;
             if(!conn.waitForReply(500ms))
             {
-                printf("gpu: Waiting for free cards...\n");
+                printf("gpu: Waiting for free cards... Use 'gpu' in another shell to see the job queue.\n");
                 hadToWait = true;
             }
 
