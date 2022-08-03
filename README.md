@@ -78,3 +78,8 @@ Admin HowTo
 -----------
 
 Debian packages are available on the GitHub releases page.
+
+The server features a maintenance mode, which blocks accepting new jobs
+and displays an appropriate message to the user. You can switch to
+maintenance mode by creating a file `/var/run/gpu_claim_maintenance`.
+Removing the file disables maintenance mode again.
