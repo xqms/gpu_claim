@@ -50,6 +50,7 @@ struct StatusResponse
 {
     std::vector<Card> cards;
     std::vector<Job> jobsInQueue;
+    bool maintenance;
 };
 
 struct ClaimRequest

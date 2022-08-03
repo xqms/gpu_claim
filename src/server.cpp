@@ -15,6 +15,7 @@
 #include <memory>
 #include <ranges>
 #include <sstream>
+#include <filesystem>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -71,6 +72,7 @@ std::vector<std::unique_ptr<Client>> g_clients;
 PriorityQueue g_jobQueue;
 std::size_t gpuLimitPerUser = 8;
 std::vector<Client*> deleteList;
+bool g_blockedForMaintenance = false;
 
 void claim(Card& card, int uid, int gid=65534)
 {
@@ -235,6 +237,8 @@ void periodicUpdate()
             deleteList.push_back(client.get());
     }
 
+    g_blockedForMaintenance = std::filesystem::exists("/var/run/gpu_claim_maintenance");
+
     // Check if next jobs are feasible
     g_jobQueue.update();
     while(!g_jobQueue.empty())
@@ -246,6 +250,17 @@ void periodicUpdate()
         if(it == g_clients.end())
             throw std::logic_error{"Job without client"};
         auto& client = *it;
+
+        if(g_blockedForMaintenance)
+        {
+            printf("Sending maintenance notice\n");
+            ClaimResponse resp;
+            resp.error = "Server is undergoing maintenance and will not accept new jobs.";
+            client->send(resp);
+            deleteList.push_back(client.get());
+            g_jobQueue.pop_front();
+            continue;
+        }
 
         // Can we immediately satisfy this request?
         std::vector<int> freeCards;
@@ -265,6 +280,8 @@ void periodicUpdate()
             resp.error = "GPU per-user limit is reached";
             client->send(resp);
             deleteList.push_back(client.get());
+            g_jobQueue.pop_front();
+            continue;
         }
 
         // Not feasible currently
@@ -341,6 +358,8 @@ Client::Client(int fd)
             resp.jobsInQueue.reserve(g_jobQueue.size());
             for(const auto& job : g_jobQueue)
                 resp.jobsInQueue.push_back(job);
+
+            resp.maintenance = g_blockedForMaintenance;
 
             send(resp);
             return false;

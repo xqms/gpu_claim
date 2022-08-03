@@ -263,6 +263,14 @@ int main(int argc, char** argv)
                 );
             }
         }
+
+        if(resp.maintenance)
+        {
+            printf("\n");
+            printf("============================================================================\n");
+            printf("The server is undergoing maintenance and currently does not accept new jobs.\n");
+            printf("============================================================================\n");
+        }
     }
     else if(command == "claim")
     {
