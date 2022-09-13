@@ -147,6 +147,15 @@ void updateCardFromNVML(unsigned int devIdx, Card& card, const std::chrono::stea
     }
     card.reservedByUID = st.st_uid;
 
+    // Reset mode to rw- --- ---
+    if(st.st_mode & (S_IWGRP | S_IRGRP | S_IWOTH | S_IROTH))
+    {
+        if(chmod(buf, 0600) != 0)
+        {
+            fprintf(stderr, "Could not set mode of %s: %s\n", buf, strerror(errno));
+        }
+    }
+
     unsigned int procCount = processBuf.size();
     if(auto err = nvmlDeviceGetComputeRunningProcesses(dev, &procCount, processBuf.data()))
     {
