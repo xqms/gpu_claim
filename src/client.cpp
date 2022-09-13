@@ -122,6 +122,12 @@ private:
     int m_fd = -1;
 };
 
+bool g_caughtSigint = false;
+void handle_sigint(int)
+{
+    g_caughtSigint = true;
+}
+
 int main(int argc, char** argv)
 {
     namespace po = boost::program_options;
@@ -367,8 +373,6 @@ int main(int argc, char** argv)
         }
         std::string devicesString = ss.str();
 
-
-
         int pid = fork();
         if(pid < 0)
         {
@@ -398,11 +402,29 @@ int main(int argc, char** argv)
             std::abort();
         }
 
-        int status = 0;
-        if(waitpid(pid, &status, 0) < 0)
+        signal(SIGINT, &handle_sigint);
+
+        bool killed = false;
+        while(true)
         {
-            perror("Could not wait for child process");
-            std::exit(1);
+            if(g_caughtSigint && !killed)
+            {
+                fprintf(stderr, "[gpu] Caught SIGINT, propagating to child process...\n");
+                kill(pid, SIGINT);
+                killed = true;
+            }
+
+            int status = 0;
+            int ret = waitpid(pid, &status, WNOHANG);
+            if(ret < 0)
+            {
+                perror("Could not wait for child process");
+                std::exit(1);
+            }
+            if(ret > 0)
+                break;
+
+            usleep(200 * 1000);
         }
 
         {
