@@ -212,7 +212,7 @@ int main(int argc, char** argv)
         {
             auto& card = resp.cards[i];
 
-            printf("[%lu] %s | %2d%% | %6lu / %6lu MB |",
+            printf("[%lu] %s │ %3d%% │ %6lu / %6lu MB │",
                 i, card.name.c_str(),
                 card.computeUsagePercent,
                 card.memoryUsage / 1000000UL, card.memoryTotal / 1000000UL
@@ -221,7 +221,7 @@ int main(int argc, char** argv)
             struct passwd *pws;
             pws = getpwuid(card.reservedByUID);
             if(card.reservedByUID == 0 || !pws)
-                printf("%22s |", "free");
+                printf("%27s │", "free");
             else
             {
                 auto idleTime = now - card.lastUsageTime;
@@ -232,9 +232,9 @@ int main(int argc, char** argv)
                 });
 
                 if(used)
-                    printf("%10s   (running) |", pws->pw_name);
+                    printf("%15s   (running) │", pws->pw_name);
                 else
-                    printf("%10s (idle %ldmin) |", pws->pw_name, minutes.count());
+                    printf("%15s (idle %ldmin) │", pws->pw_name, minutes.count());
             }
 
             for(auto& proc : card.processes)
