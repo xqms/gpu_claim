@@ -220,8 +220,13 @@ int main(int argc, char** argv)
 
             struct passwd *pws;
             pws = getpwuid(card.reservedByUID);
-            if(card.reservedByUID == 0 || !pws)
-                printf("%27s │", "free");
+            if(card.reservedByUID == 0)
+            {
+                if(card.processes.empty())
+                    printf("%27s │", "free");
+                else
+                    printf("%27s |", "waiting for exit");
+            }
             else
             {
                 auto idleTime = now - card.lastUsageTime;
@@ -232,9 +237,9 @@ int main(int argc, char** argv)
                 });
 
                 if(used)
-                    printf("%15s   (running) │", pws->pw_name);
+                    printf("%15s   (running) │", pws ? pws->pw_name : "unknown");
                 else
-                    printf("%15s (idle %ldmin) │", pws->pw_name, minutes.count());
+                    printf("%15s (idle %ldmin) │", pws ? pws->pw_name : "unknown", minutes.count());
             }
 
             for(auto& proc : card.processes)

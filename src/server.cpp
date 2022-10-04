@@ -93,9 +93,16 @@ void claim(Card& card, int uid, int gid=65534)
     card.lastUsageTime = std::chrono::steady_clock::now();
 
     if(uid == 0)
+    {
         printf("Card %d released.\n", card.index);
+        card.lockedUntilUpdate = true;
+    }
     else
-        printf("Card %d claimed by UID %d.\n", card.index, uid);
+    {
+        struct passwd *pws;
+        pws = getpwuid(uid);
+        printf("Card %d claimed by UID %d (%s).\n", card.index, uid, pws ? pws->pw_name : "unknown");
+    }
 }
 
 void release(Card& card)
@@ -174,6 +181,7 @@ void updateCardFromNVML(unsigned int devIdx, Card& card, const std::chrono::stea
         struct stat st{};
         if(stat(buf, &st) != 0)
         {
+            fprintf(stderr, "Could not stat %s: %s\n", buf, strerror(errno));
             card.processes.pop_back();
             continue;
         }
@@ -212,14 +220,10 @@ void updateCardFromNVML(unsigned int devIdx, Card& card, const std::chrono::stea
         proc.uid = st.st_uid;
     }
 
-    if(card.reservedByUID != 0)
-    {
-        for(auto& proc : card.processes)
-        {
-            if(card.reservedByUID == proc.uid)
-                card.lastUsageTime = now;
-        }
-    }
+    if(!card.processes.empty())
+        card.lastUsageTime = now;
+
+    card.lockedUntilUpdate = false;
 }
 
 void periodicUpdate()
@@ -276,7 +280,7 @@ void periodicUpdate()
         for(std::size_t i = 0; i < g_cards.size(); ++i)
         {
             auto& card = g_cards[i];
-            if(card.reservedByUID == 0)
+            if(card.reservedByUID == 0 && !card.lockedUntilUpdate && card.processes.empty())
                 freeCards.push_back(i);
         }
 

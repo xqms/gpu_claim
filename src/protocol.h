@@ -32,6 +32,7 @@ struct Card
     std::vector<Process> processes;
 
     std::chrono::steady_clock::time_point lastUsageTime;
+    bool lockedUntilUpdate = false;
 };
 
 struct Job
