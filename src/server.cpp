@@ -213,6 +213,7 @@ void updateCardFromNVML(unsigned int devIdx, Card& card, const std::chrono::stea
         struct stat st{};
         if(stat(buf, &st) != 0)
         {
+            fprintf(stderr, "Could not stat %s: %s\n", buf, strerror(errno));
             card.processes.pop_back();
             continue;
         }
@@ -481,6 +482,20 @@ int main(int argc, char** argv)
         }
     }
 
+    // Because nvidia is stupid, NVML will reset the owner & permissions on init.
+    // Let's try to restore permissions afterwards.
+    std::vector<unsigned int> owner;
+    for(unsigned int i = 0;; ++i)
+    {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "/dev/nvidia%u", i);
+        struct stat st{};
+        if(stat(buf, &st) != 0)
+            break;
+
+        owner.push_back(st.st_uid);
+    }
+
     if(auto err = nvmlInitWithFlags(0))
     {
         fprintf(stderr, "Could not initialize NVML: %s\n", nvmlErrorString(err));
@@ -530,6 +545,20 @@ int main(int argc, char** argv)
             return 1;
         }
         card.memoryTotal = mem.total;
+
+        if(auto err = nvmlDeviceGetMinorNumber(dev, &card.minorID))
+        {
+            fprintf(stderr, "Could not query device ID: %s\n", nvmlErrorString(err));
+            std::exit(1);
+        }
+
+        // Restore owner
+        if(card.minorID < owner.size())
+        {
+            char buf[256];
+            snprintf(buf, sizeof(buf), "/dev/nvidia%u", card.minorID);
+            chown(buf, owner[card.minorID], 65534);
+        }
 
         card.lastUsageTime = std::chrono::steady_clock::now();
     }
