@@ -49,7 +49,7 @@ struct Client
 
     ~Client()
     {
-        printf("Closing connection to client %d (UID %d)\n", pid, uid);
+//         printf("Closing connection to client %d (UID %d)\n", pid, uid);
         if(fd >= 0)
             close(fd);
     };
@@ -645,7 +645,7 @@ int main(int argc, char** argv)
 
                 if(!client->communicate())
                 {
-                    printf("Client::communicate() returned false\n");
+//                     printf("Client::communicate() returned false\n");
                     deleteList.push_back(client);
                 }
             }
