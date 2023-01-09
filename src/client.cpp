@@ -225,7 +225,7 @@ int main(int argc, char** argv)
                 if(card.processes.empty())
                     printf("%27s │", "free");
                 else
-                    printf("%27s |", "waiting for exit");
+                    printf("%27s │", "waiting for exit");
             }
             else
             {
