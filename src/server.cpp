@@ -25,6 +25,7 @@
 #include <sys/timerfd.h>
 #include <unistd.h>
 #include <pwd.h>
+#include <signal.h>
 
 #include <zpp_bits.h>
 
@@ -74,6 +75,37 @@ std::size_t gpuLimitPerUser = 8;
 std::vector<Client*> deleteList;
 bool g_blockedForMaintenance = false;
 
+void killRemainingProcesses(const char* cardPath)
+{
+    // Kill any remaining processes which where not visible with NVML (this can happen sometimes)
+    char fusercmd[256];
+    snprintf(fusercmd, sizeof(fusercmd), "fuser %s", cardPath);
+
+    FILE* f = popen(fusercmd, "r");
+    if(!f)
+    {
+        perror("Could not call fuser");
+        return;
+    }
+
+    char buf[256];
+
+    while(!feof(f))
+    {
+        int pid;
+        if(fscanf(f, "%d", &pid) != 1)
+        {
+            fprintf(stderr, "Could not read fuser result\n");
+            break;
+        }
+
+        printf("Killing leftover process %d.\n", pid);
+        kill(pid, 9);
+    }
+
+    fclose(f);
+}
+
 void claim(Card& card, int uid, int gid=65534)
 {
     if(uid < 0)
@@ -94,6 +126,7 @@ void claim(Card& card, int uid, int gid=65534)
 
     if(uid == 0)
     {
+        killRemainingProcesses(buf);
         printf("Card %d released.\n", card.index);
         card.lockedUntilUpdate = true;
     }
