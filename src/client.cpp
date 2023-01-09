@@ -247,8 +247,8 @@ int main(int argc, char** argv)
                 struct passwd *pws;
                 pws = getpwuid(proc.uid);
 
-                printf(" %s(%luM)",
-                    pws->pw_name, proc.memory / 1000000UL
+                printf(" %s(PID %d, %luM)",
+                    pws->pw_name, proc.pid, proc.memory / 1000000UL
                 );
             }
             printf("\n");
