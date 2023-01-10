@@ -90,6 +90,8 @@ void killRemainingProcesses(const char* cardPath)
 
     char buf[256];
 
+    int mypid = getpid();
+
     while(!feof(f))
     {
         int pid;
@@ -98,6 +100,9 @@ void killRemainingProcesses(const char* cardPath)
             fprintf(stderr, "Could not read fuser result\n");
             break;
         }
+
+        if(pid == mypid)
+            continue;
 
         printf("Killing leftover process %d.\n", pid);
         kill(pid, 9);
