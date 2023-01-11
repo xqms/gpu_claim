@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <iostream>
 #include <filesystem>
+#include <regex>
 
 #include <sys/types.h>
 #include <sys/un.h>
@@ -128,6 +129,21 @@ void handle_sigint(int)
     g_caughtSigint = true;
 }
 
+std::filesystem::path path_to_install_prefix()
+{
+    char self[PATH_MAX] = {};
+    int nchar = readlink("/proc/self/exe", self, sizeof(self)-1);
+    if(nchar < 0 || nchar == sizeof(self)-1)
+    {
+        perror("Could not readlink /proc/self/exe");
+        std::exit(1);
+    }
+
+    self[nchar] = 0;
+
+    return std::filesystem::path{self}.parent_path().parent_path();
+}
+
 int main(int argc, char** argv)
 {
     namespace po = boost::program_options;
@@ -194,6 +210,8 @@ int main(int argc, char** argv)
     }
 
     po::notify(vm);
+
+    auto installPath = path_to_install_prefix();
 
     std::string command = vm["command"].as<std::string>();
     if(command == "status")
@@ -316,29 +334,17 @@ int main(int argc, char** argv)
     }
     else if(command == "run")
     {
-        namespace fs = std::filesystem;
-
         if(startOfRunArgs == argc)
         {
             fprintf(stderr, "Need command to run.\n");
             return 1;
         }
 
-        std::string executable = argv[startOfRunArgs];
-
-        // If the executable is not absolute, look it up
-        if(executable[0] != '/')
+        auto hide_devices = installPath / "lib/gpu/hide_devices";
+        if(!std::filesystem::exists(hide_devices))
         {
-            char* path = strdup(getenv("PATH"));
-
-            for(char* dir = strtok(path, ":"); dir; dir = strtok(NULL, ":"))
-            {
-                fs::path p = fs::path(dir) / executable;
-                if(fs::exists(p))
-                    executable = p.string();
-            }
-
-            free(path);
+            fprintf(stderr, "Could not find hide_devices helper (expected it at %s)\n", hide_devices.c_str());
+            return 1;
         }
 
         std::uint32_t nGPUs = vm["num-cards"].as<unsigned int>();
@@ -393,11 +399,36 @@ int main(int argc, char** argv)
             setenv("debian_chroot", "GPU shell", 1);
 
             std::vector<char*> args;
+            args.push_back(strdup("hide_devices"));
+
+            // Add all devices that we need to hide to the argument list
+            {
+                auto deviceRegex = std::regex{"nvidia(\\d+)"};
+                for(auto& entry : std::filesystem::directory_iterator{"/dev"})
+                {
+                    auto filename = entry.path().filename().string();
+
+                    std::smatch match;
+                    if(!std::regex_match(filename, match, deviceRegex))
+                        continue;
+
+                    unsigned long x = std::stoul(match[1]);
+
+                    auto it = std::find_if(resp.claimedCards.begin(), resp.claimedCards.end(), [&](auto& card){ return card.minorID == x; });
+                    if(it == resp.claimedCards.end())
+                        args.push_back(strdup(filename.c_str()));
+                }
+            }
+
+            // Everything after this gets executed inside the "container"
+            args.push_back(strdup("--"));
+
             for(int i = startOfRunArgs; i < argc; ++i)
                 args.push_back(strdup(argv[i]));
+
             args.push_back(nullptr);
 
-            if(execv(executable.c_str(), args.data()) != 0)
+            if(execv(hide_devices.c_str(), args.data()) != 0)
             {
                 perror("Could not execute command");
                 std::exit(1);

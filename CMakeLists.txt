@@ -45,11 +45,22 @@ target_link_options(gpu PRIVATE
     "-static-libstdc++" "-static-libgcc"
 )
 
+add_executable(hide_devices
+    src/hide_devices.cpp
+)
+target_link_options(hide_devices PRIVATE
+    "-static-libstdc++" "-static-libgcc"
+)
+
 install(TARGETS gpu
     RUNTIME DESTINATION bin
 )
 install(TARGETS gpu_server
     RUNTIME DESTINATION sbin
+)
+install(TARGETS hide_devices
+    RUNTIME DESTINATION lib/gpu/
+    PERMISSIONS OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE SETUID
 )
 install(FILES files/gpu_claim.conf
     DESTINATION /etc/modprobe.d/
