@@ -70,16 +70,44 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    mkdir("/tmp/select_nvidia/whiteout", 0700);
+
     // Create whiteout files -- overlayfs will hide these files
     for(int i = 1; i < sepIdx; ++i)
     {
-        auto filename = std::string{"/tmp/select_nvidia/"} + argv[i];
+        auto filename = std::string{"/tmp/select_nvidia/whiteout/"} + argv[i];
         mknod(filename.c_str(), S_IFCHR | 0666, makedev(0, 0));
     }
 
-    if(mount("overlay", "/dev", "overlay", 0, "lowerdir=/tmp/select_nvidia:/dev") != 0)
+    // Bind /dev/shm somewhere else temporarily
+    mkdir("/tmp/gpu_claim_shm", 0700);
+    mkdir("/tmp/gpu_claim_pts", 0700);
+    if(mount("/dev/shm", "/tmp/gpu_claim_shm", "", MS_MOVE, nullptr) != 0)
+    {
+        perror("Could not move /dev/shm");
+        return 1;
+    }
+    if(mount("/dev/pts", "/tmp/gpu_claim_pts", "", MS_MOVE, nullptr) != 0)
+    {
+        perror("Could not move /dev/pts");
+        return 1;
+    }
+
+    if(mount("overlay", "/dev", "overlay", 0, "lowerdir=/tmp/select_nvidia/whiteout:/dev") != 0)
     {
         perror("Could not create /dev overlay");
+        return 1;
+    }
+
+    // Move /dev/shm back on top
+    if(mount("/tmp/gpu_claim_shm", "/dev/shm", "", MS_MOVE, nullptr) != 0)
+    {
+        perror("Could not move /dev/shm back");
+        return 1;
+    }
+    if(mount("/tmp/gpu_claim_pts", "/dev/pts", "", MS_MOVE, nullptr) != 0)
+    {
+        perror("Could not move /dev/pts back");
         return 1;
     }
 
