@@ -177,6 +177,14 @@ void updateCardFromNVML(unsigned int devIdx, Card& card, const std::chrono::stea
     }
     card.computeUsagePercent = util.gpu;
 
+    unsigned int temp = 0;
+    if(auto err = nvmlDeviceGetTemperature(dev, NVML_TEMPERATURE_GPU, &temp))
+    {
+        fprintf(stderr, "Could not get temperature: %s\n", nvmlErrorString(err));
+        std::exit(1);
+    }
+    card.temperatureCelsius = temp;
+
     if(auto err = nvmlDeviceGetMinorNumber(dev, &card.minorID))
     {
         fprintf(stderr, "Could not query device ID: %s\n", nvmlErrorString(err));

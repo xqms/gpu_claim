@@ -230,9 +230,9 @@ int main(int argc, char** argv)
         {
             auto& card = resp.cards[i];
 
-            printf("[%lu] %s │ %3d%% │ %6lu / %6lu MB │",
+            printf("[%lu] %s │ %3d%% %3d°C │ %6lu / %6lu MB │",
                 i, card.name.c_str(),
-                card.computeUsagePercent,
+                card.computeUsagePercent, card.temperatureCelsius,
                 card.memoryUsage / 1000000UL, card.memoryTotal / 1000000UL
             );
 

@@ -25,8 +25,9 @@ struct Card
     std::string name;
     std::string uuid;
     std::uint8_t computeUsagePercent = 0;
-    std::uint64_t memoryTotal = 0.0f;
-    std::uint64_t memoryUsage = 0.0f;
+    std::uint64_t memoryTotal = 0;
+    std::uint64_t memoryUsage = 0;
+    std::uint16_t temperatureCelsius = 0;
 
     int reservedByUID = 0;
     std::vector<Process> processes;
