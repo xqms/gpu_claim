@@ -62,7 +62,8 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    mkdir("/tmp/select_nvidia", 0700);
+    mkdir("/tmp/select_nvidia", 0755);
+    chmod("/tmp/select_nvidia", 0755);
 
     if(mount("none", "/tmp/select_nvidia", "tmpfs", 0, nullptr) != 0)
     {
@@ -70,7 +71,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    mkdir("/tmp/select_nvidia/whiteout", 0700);
+    mkdir("/tmp/select_nvidia/whiteout", 0755);
 
     // Create whiteout files -- overlayfs will hide these files
     for(int i = 1; i < sepIdx; ++i)
