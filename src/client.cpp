@@ -153,6 +153,7 @@ int main(int argc, char** argv)
         ("help,h", "Help")
         ("version,v", "Display version")
         ("num-cards,n", po::value<unsigned int>()->default_value(1)->value_name("N"), "Number of GPUs to claim")
+        ("no-isolation", "Disable device isolation")
     ;
 
     po::options_description hidden{"Hidden"};
@@ -340,6 +341,7 @@ int main(int argc, char** argv)
             return 1;
         }
 
+        bool doHideDevices = !vm.count("no-isolation");
         auto hide_devices = installPath / "lib/gpu/hide_devices";
         if(!std::filesystem::exists(hide_devices))
         {
@@ -399,10 +401,15 @@ int main(int argc, char** argv)
             setenv("debian_chroot", "GPU shell", 1);
 
             std::vector<char*> args;
-            args.push_back(strdup("hide_devices"));
+            std::string executable;
 
             // Add all devices that we need to hide to the argument list
+            if(doHideDevices)
             {
+                // argv[0]
+                executable = hide_devices;
+                args.push_back(strdup("hide_devices"));
+
                 auto deviceRegex = std::regex{"nvidia(\\d+)"};
                 for(auto& entry : std::filesystem::directory_iterator{"/dev"})
                 {
@@ -418,17 +425,19 @@ int main(int argc, char** argv)
                     if(it == resp.claimedCards.end())
                         args.push_back(strdup(filename.c_str()));
                 }
-            }
 
-            // Everything after this gets executed inside the "container"
-            args.push_back(strdup("--"));
+                // Everything after this gets executed inside the "container"
+                args.push_back(strdup("--"));
+            }
+            else
+                executable = argv[startOfRunArgs];
 
             for(int i = startOfRunArgs; i < argc; ++i)
                 args.push_back(strdup(argv[i]));
 
             args.push_back(nullptr);
 
-            if(execv(hide_devices.c_str(), args.data()) != 0)
+            if(execvp(executable.c_str(), args.data()) != 0)
             {
                 perror("Could not execute command");
                 std::exit(1);
