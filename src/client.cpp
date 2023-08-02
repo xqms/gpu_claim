@@ -342,10 +342,10 @@ int main(int argc, char** argv)
         }
 
         bool doHideDevices = !vm.count("no-isolation");
-        auto hide_devices = installPath / "lib/gpu/hide_devices";
-        if(!std::filesystem::exists(hide_devices))
+        auto gpu_container = installPath / "lib/gpu/gpu_container";
+        if(!std::filesystem::exists(gpu_container))
         {
-            fprintf(stderr, "Could not find hide_devices helper (expected it at %s)\n", hide_devices.c_str());
+            fprintf(stderr, "Could not find gpu_container helper (expected it at %s)\n", gpu_container.c_str());
             return 1;
         }
 
@@ -407,8 +407,8 @@ int main(int argc, char** argv)
             if(doHideDevices)
             {
                 // argv[0]
-                executable = hide_devices;
-                args.push_back(strdup("hide_devices"));
+                executable = gpu_container;
+                args.push_back(strdup("gpu_container"));
 
                 auto deviceRegex = std::regex{"nvidia(\\d+)"};
                 for(auto& entry : std::filesystem::directory_iterator{"/dev"})

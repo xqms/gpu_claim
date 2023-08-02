@@ -1,4 +1,6 @@
-// Hide
+// Containerize the child process so that it only sees the specified GPUs
+// Author: Max Schwarz <max.schwarz@ais.uni-bonn.de>
+
 #include <sched.h>
 #include <stdio.h>
 
@@ -14,7 +16,7 @@
 
 void usage()
 {
-    fprintf(stderr, "Usage: hide_devices <device file names...> -- <command> [args]\n");
+    fprintf(stderr, "Usage: gpu_container <device file names...> -- <command> [args]\n");
     fprintf(stderr, "\n");
     fprintf(stderr, "This helper will hide the mentioned device file names from the command to be executed.\n");
 }
