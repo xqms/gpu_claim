@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <sys/sysmacros.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
@@ -20,6 +21,9 @@ void usage()
     fprintf(stderr, "\n");
     fprintf(stderr, "This helper will hide the mentioned device file names from the command to be executed.\n");
 }
+
+pid_t childProcessPID = 0;
+pid_t userProcessPID = 0;
 
 int main(int argc, char** argv)
 {
@@ -51,9 +55,9 @@ int main(int argc, char** argv)
     }
 
     // Let's go!
-    if(unshare(CLONE_NEWNS) != 0)
+    if(unshare(CLONE_NEWNS | CLONE_NEWPID) != 0)
     {
-        perror("Could not create mount namespace");
+        perror("Could not create mount / PID namespace");
         return 1;
     }
 
@@ -115,17 +119,109 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    auto uid = getuid();
-    if(setreuid(uid, uid) != 0)
+    childProcessPID = fork();
+    if(childProcessPID < 0)
     {
-        perror("Could not drop privileges");
+        perror("Could not fork()");
         return 1;
     }
 
-    if(execvp(argv[sepIdx + 1], argv + sepIdx + 1) != 0)
+    if(childProcessPID == 0)
     {
-        perror("Could not execvp");
-        return 1;
+        // Child process, running inside the PID namespace (with PID 1)
+
+        // Remount /proc on top, since we are inside a PID namespace
+        if(mount("proc", "/proc", "proc", 0, nullptr) != 0)
+        {
+            perror("Could not mount /proc inside container");
+            return 1;
+        }
+
+        // Drop privileges
+        auto uid = getuid();
+        if(setreuid(uid, uid) != 0)
+        {
+            perror("Could not drop privileges");
+            return 1;
+        }
+
+        userProcessPID = fork();
+        if(userProcessPID < 0)
+        {
+            perror("Could not fork()");
+            return 1;
+        }
+
+        if(userProcessPID == 0)
+        {
+            // Child process, will become the user application
+            if(execvp(argv[sepIdx + 1], argv + sepIdx + 1) != 0)
+            {
+                perror("Could not execvp");
+                return 1;
+            }
+        }
+        else
+        {
+            // Wait for child processes that exit. If it's our direct child process
+            // (i.e. the user app), exit ourselves.
+
+            // Forward SIGINT to child
+            signal(SIGINT, [](int){
+                if(kill(userProcessPID, SIGINT) != 0)
+                    perror("Could not send SIGINT to user process");
+            });
+
+            while(true)
+            {
+                auto child = wait(nullptr);
+                if(child < 0)
+                {
+                    if(errno == EINTR)
+                        continue;
+
+                    perror("Could not wait() for childs");
+                    return 1;
+                }
+                if(child == userProcessPID)
+                {
+                    return 0;
+                }
+            }
+        }
+    }
+    else
+    {
+        // Parent process running outside the PID namespace
+
+        // Drop privileges
+        auto uid = getuid();
+        if(setreuid(uid, uid) != 0)
+        {
+            perror("Could not drop privileges");
+            return 1;
+        }
+
+        // Forward SIGINT to child
+        signal(SIGINT, [](int){
+            if(kill(childProcessPID, SIGINT) != 0)
+                perror("Could not send SIGINT to child container process");
+        });
+
+        while(true)
+        {
+            auto child = waitpid(childProcessPID, nullptr, 0);
+            if(child < 0)
+            {
+                if(errno == EINTR)
+                    continue;
+
+                perror("Could not waitpid() for child process");
+                return 1;
+            }
+
+            break;
+        }
     }
 
     return 0;
