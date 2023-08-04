@@ -45,10 +45,10 @@ target_link_options(gpu PRIVATE
     "-static-libstdc++" "-static-libgcc"
 )
 
-add_executable(hide_devices
-    src/hide_devices.cpp
+add_executable(gpu_container
+    src/gpu_container.cpp
 )
-target_link_options(hide_devices PRIVATE
+target_link_options(gpu_container PRIVATE
     "-static-libstdc++" "-static-libgcc"
 )
 
@@ -58,7 +58,7 @@ install(TARGETS gpu
 install(TARGETS gpu_server
     RUNTIME DESTINATION sbin
 )
-install(TARGETS hide_devices
+install(TARGETS gpu_container
     RUNTIME DESTINATION lib/gpu/
     PERMISSIONS OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE SETUID
 )
