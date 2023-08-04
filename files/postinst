@@ -1,4 +1,10 @@
 #!/bin/bash
 
+perms=$(stat -c "%A" /dev/nvidia0 || true)
+if [[ $perms != "crw-------" ]]; then
+    echo "Permissions on /dev/nvidia* are not correct. You will probably require a reboot to load the new driver settings."
+    touch "/run/reboot-required"
+fi
+
 systemctl enable gpu_server.service
 systemctl restart gpu_server.service
