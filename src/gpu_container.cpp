@@ -87,14 +87,8 @@ int main(int argc, char** argv)
         mknod(filename.c_str(), S_IFCHR | 0666, makedev(0, 0));
     }
 
-    // Bind /dev/shm somewhere else temporarily
-    mkdir("/tmp/select_nvidia/shm", 0700);
+    // Bind /dev/pts somewhere else temporarily
     mkdir("/tmp/select_nvidia/pts", 0700);
-    if(mount("/dev/shm", "/tmp/select_nvidia/shm", "", MS_MOVE, nullptr) != 0)
-    {
-        perror("Could not move /dev/shm");
-        return 1;
-    }
     if(mount("/dev/pts", "/tmp/select_nvidia/pts", "", MS_MOVE, nullptr) != 0)
     {
         perror("Could not move /dev/pts");
@@ -107,16 +101,20 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    // Move /dev/shm back on top
-    if(mount("/tmp/select_nvidia/shm", "/dev/shm", "", MS_MOVE, nullptr) != 0)
-    {
-        perror("Could not move /dev/shm back");
-        return 1;
-    }
+    // Move /dev/pts back on top
     if(mount("/tmp/select_nvidia/pts", "/dev/pts", "", MS_MOVE, nullptr) != 0)
     {
         perror("Could not move /dev/pts back");
         return 1;
+    }
+
+    // Mount our own /dev/shm
+    {
+        if(mount("tmpfs", "/dev/shm", "tmpfs", 0, nullptr) != 0)
+        {
+            perror("Could not mount /dev/shm");
+            return 1;
+        }
     }
 
     childProcessPID = fork();
