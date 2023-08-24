@@ -13,6 +13,10 @@ add_definitions(
     -DVERSION_PATCH=${VERSION_PATCH}
 )
 
+include(FindCUDAToolkit.cmake OPTIONAL RESULT_VARIABLE FOUND_CMAKE_CUDA)
+if(NOT FOUND_CMAKE_CUDA)
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+endif()
 find_package(CUDAToolkit REQUIRED)
 
 set(Boost_USE_STATIC_LIBS ON)
