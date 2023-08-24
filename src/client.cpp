@@ -191,10 +191,8 @@ int main(int argc, char** argv)
             "Available commands:\n"
             "  gpu status:\n"
             "    List current GPU allocation & status\n"
-            "  gpu claim:\n"
-            "    Claim one or more GPUs\n"
             "  gpu run [options] <cmd>:\n"
-            "    Run cmd one or more GPUs. Use gpu run -nX <cmd> to use multiple GPUs.\n"
+            "    Run cmd one or more GPUs. Use gpu -nX <cmd> run to use multiple GPUs.\n"
             "\n"
             "Available options:\n"
         );
@@ -301,37 +299,6 @@ int main(int argc, char** argv)
             printf("The server is undergoing maintenance and currently does not accept new jobs.\n");
             printf("============================================================================\n");
         }
-    }
-    else if(command == "claim")
-    {
-        Connection conn;
-
-        Request req{ClaimRequest{vm["num-cards"].as<unsigned int>(), true}};
-        conn.send(req);
-
-        ClaimResponse resp;
-        conn.receive(resp);
-
-        if(resp.claimedCards.empty())
-        {
-            fprintf(stderr, "Could not claim GPUs: %s\n", resp.error.c_str());
-            return 1;
-        }
-
-        printf("Claimed %lu GPUs:\n", resp.claimedCards.size());
-        for(auto& card : resp.claimedCards)
-            printf(" - %s\n", card.name.c_str());
-        printf("\n");
-
-        printf("Use with:\n");
-        printf("export CUDA_VISIBLE_DEVICES=");
-        for(std::size_t i = 0; i < resp.claimedCards.size(); ++i)
-        {
-            fputs(resp.claimedCards[i].uuid.c_str(), stdout);
-            if(i != resp.claimedCards.size()-1)
-                fputc(',', stdout);
-        }
-        printf("\n");
     }
     else if(command == "run")
     {
