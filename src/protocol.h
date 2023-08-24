@@ -30,6 +30,7 @@ struct Card
     std::uint16_t temperatureCelsius = 0;
 
     int reservedByUID = 0;
+    int reservedByClientPID = -1;
     std::vector<Process> processes;
 
     std::chrono::steady_clock::time_point lastUsageTime;

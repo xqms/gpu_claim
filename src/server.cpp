@@ -112,7 +112,7 @@ void killRemainingProcesses(const char* cardPath)
     fclose(f);
 }
 
-void claim(Card& card, int uid, int gid=65534)
+void claim(Card& card, int uid, int gid=65534, int pid=-1)
 {
     if(uid < 0)
         throw std::logic_error{"claim(): Invalid UID"};
@@ -128,6 +128,7 @@ void claim(Card& card, int uid, int gid=65534)
         std::exit(1);
     }
     card.reservedByUID = uid;
+    card.reservedByClientPID = pid;
     card.lastUsageTime = std::chrono::steady_clock::now();
 
     if(uid == 0)
@@ -284,8 +285,22 @@ void periodicUpdate()
 
         updateCardFromNVML(devIdx, card, now);
 
+        if(card.processes.empty() && card.reservedByClientPID != -1)
+        {
+            // Is our client still alive?
+            auto it = std::find_if(g_clients.begin(), g_clients.end(), [&](auto& client){
+                return client->pid == card.reservedByClientPID;
+            });
+
+            if(it == g_clients.end() || kill(card.reservedByClientPID, 0) != 0)
+            {
+                printf("Returning card %u, client is not connected/existent anymore\n", devIdx);
+                release(card);
+            }
+        }
+
         using namespace std::chrono_literals;
-        if(card.reservedByUID && now - card.lastUsageTime > 5min)
+        if(card.reservedByUID && now - card.lastUsageTime > 1min)
         {
             printf("Returning card %u, no usage for long time\n", devIdx);
             release(card);
@@ -355,7 +370,7 @@ void periodicUpdate()
         ClaimResponse resp;
         for(unsigned int i = 0; i < job.numGPUs; ++i)
         {
-            claim(g_cards[freeCards[i]], job.uid);
+            claim(g_cards[freeCards[i]], job.uid, 65534, job.pid);
             resp.claimedCards.push_back(g_cards[freeCards[i]]);
         }
         client->send(resp);
