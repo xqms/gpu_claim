@@ -8,6 +8,7 @@
 #include <sys/mount.h>
 #include <sys/sysmacros.h>
 #include <sys/wait.h>
+#include <sys/prctl.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
@@ -53,6 +54,9 @@ int main(int argc, char** argv)
         usage();
         return 1;
     }
+
+    // Request that we get a SIGTERM whenever the parent process dies
+    prctl(PR_SET_PDEATHSIG, SIGTERM);
 
     // Let's go!
     if(unshare(CLONE_NEWNS | CLONE_NEWPID) != 0)
@@ -127,6 +131,9 @@ int main(int argc, char** argv)
     if(childProcessPID == 0)
     {
         // Child process, running inside the PID namespace (with PID 1)
+
+        // Request that we get a SIGTERM whenever the parent process dies
+        prctl(PR_SET_PDEATHSIG, SIGTERM);
 
         // Remount /proc on top, since we are inside a PID namespace
         if(mount("proc", "/proc", "proc", 0, nullptr) != 0)
