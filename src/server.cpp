@@ -162,6 +162,7 @@ void updateCardFromNVML(unsigned int devIdx, Card& card, const std::chrono::stea
     }
 
     nvmlMemory_v2_t mem{};
+    mem.version = nvmlMemory_v2;
     if(auto err = nvmlDeviceGetMemoryInfo_v2(dev, &mem))
     {
         fprintf(stderr, "Could not get memory info: %s\n", nvmlErrorString(err));
@@ -586,6 +587,8 @@ int main(int argc, char** argv)
         card.uuid = buf;
 
         nvmlMemory_v2_t mem{};
+        mem.version = nvmlMemory_v2;
+
         if(auto err = nvmlDeviceGetMemoryInfo_v2(dev, &mem))
         {
             fprintf(stderr, "Could not get memory info: %s\n", nvmlErrorString(err));
