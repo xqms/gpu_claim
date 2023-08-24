@@ -249,7 +249,7 @@ int main(int argc, char** argv)
             else
             {
                 auto idleTime = now - card.lastUsageTime;
-                auto minutes = std::chrono::duration_cast<std::chrono::minutes>(idleTime);
+                auto seconds = std::chrono::duration_cast<std::chrono::seconds>(idleTime);
 
                 bool used = std::ranges::any_of(card.processes, [&](auto& proc){
                     return proc.uid == card.reservedByUID;
@@ -258,7 +258,7 @@ int main(int argc, char** argv)
                 if(used)
                     printf("%15s   (running) │", pws ? pws->pw_name : "unknown");
                 else
-                    printf("%15s (idle %ldmin) │", pws ? pws->pw_name : "unknown", minutes.count());
+                    printf("%15s (idle %ldsec) │", pws ? pws->pw_name : "unknown", seconds.count());
             }
 
             for(auto& proc : card.processes)
