@@ -1,6 +1,7 @@
 // Server
 // Author: Max Schwarz <max.schwarz@ais.uni-bonn.de>
 
+#define NVML_NO_UNVERSIONED_FUNC_DEFS
 #include <nvml.h>
 
 #include <cstdio>
@@ -151,17 +152,17 @@ void release(Card& card)
 void updateCardFromNVML(unsigned int devIdx, Card& card, const std::chrono::steady_clock::time_point& now = std::chrono::steady_clock::now())
 {
     char buf[1024];
-    std::array<nvmlProcessInfo_t, 128> processBuf;
+    std::array<nvmlProcessInfo_v2_t, 128> processBuf;
 
     nvmlDevice_t dev{};
-    if(auto err = nvmlDeviceGetHandleByIndex(devIdx, &dev))
+    if(auto err = nvmlDeviceGetHandleByIndex_v2(devIdx, &dev))
     {
         fprintf(stderr, "Could not get device %u: %s\n", devIdx, nvmlErrorString(err));
         std::exit(1);
     }
 
-    nvmlMemory_t mem{};
-    if(auto err = nvmlDeviceGetMemoryInfo(dev, &mem))
+    nvmlMemory_v2_t mem{};
+    if(auto err = nvmlDeviceGetMemoryInfo_v2(dev, &mem))
     {
         fprintf(stderr, "Could not get memory info: %s\n", nvmlErrorString(err));
         std::exit(1);
@@ -210,7 +211,7 @@ void updateCardFromNVML(unsigned int devIdx, Card& card, const std::chrono::stea
     }
 
     unsigned int procCount = processBuf.size();
-    if(auto err = nvmlDeviceGetComputeRunningProcesses(dev, &procCount, processBuf.data()))
+    if(auto err = nvmlDeviceGetComputeRunningProcesses_v2(dev, &procCount, processBuf.data()))
     {
         fprintf(stderr, "Could not get running processes: %s\n", nvmlErrorString(err));
         procCount = 0;
@@ -236,7 +237,7 @@ void updateCardFromNVML(unsigned int devIdx, Card& card, const std::chrono::stea
     }
 
     procCount = processBuf.size();
-    if(auto err = nvmlDeviceGetGraphicsRunningProcesses(dev, &procCount, processBuf.data()))
+    if(auto err = nvmlDeviceGetGraphicsRunningProcesses_v2(dev, &procCount, processBuf.data()))
     {
         fprintf(stderr, "Could not get running processes: %s\n", nvmlErrorString(err));
         procCount = 0;
@@ -584,8 +585,8 @@ int main(int argc, char** argv)
         }
         card.uuid = buf;
 
-        nvmlMemory_t mem{};
-        if(auto err = nvmlDeviceGetMemoryInfo(dev, &mem))
+        nvmlMemory_v2_t mem{};
+        if(auto err = nvmlDeviceGetMemoryInfo_v2(dev, &mem))
         {
             fprintf(stderr, "Could not get memory info: %s\n", nvmlErrorString(err));
             return 1;
