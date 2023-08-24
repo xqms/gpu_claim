@@ -347,7 +347,7 @@ int main(int argc, char** argv)
         std::stringstream ss;
         for(std::size_t i = 0; i < resp.claimedCards.size(); ++i)
         {
-            ss << resp.claimedCards[i].uuid;
+            ss << i;
             if(i != resp.claimedCards.size()-1)
                 ss << ",";
         }
