@@ -288,13 +288,9 @@ void periodicUpdate()
         if(card.processes.empty() && card.reservedByClientPID != -1)
         {
             // Is our client still alive?
-            auto it = std::find_if(g_clients.begin(), g_clients.end(), [&](auto& client){
-                return client->pid == card.reservedByClientPID;
-            });
-
-            if(it == g_clients.end() || kill(card.reservedByClientPID, 0) != 0)
+            if(kill(card.reservedByClientPID, 0) != 0)
             {
-                printf("Returning card %u, client is not connected/existent anymore\n", devIdx);
+                printf("Returning card %u, client with PID %d is not alive anymore\n", devIdx, card.reservedByClientPID);
                 release(card);
             }
         }
