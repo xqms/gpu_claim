@@ -23,8 +23,9 @@ set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost REQUIRED COMPONENTS program_options)
 
 add_executable(gpu_server
-    src/server.cpp
-    src/priority_queue.cpp
+    src/server/server.cpp
+    src/server/client.cpp
+    src/server/gpu_info.cpp
 )
 target_include_directories(gpu_server PRIVATE
     contrib/zpp_bits

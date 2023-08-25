@@ -8,8 +8,11 @@
 #include <cstdint>
 #include <string>
 #include <chrono>
+#include <list>
 
 #include <zpp_bits.h>
+
+constexpr std::size_t gpuLimitPerUser = 8;
 
 struct Process
 {
@@ -46,14 +49,21 @@ struct Job
     std::chrono::system_clock::time_point submissionTime;
 };
 
+struct ServerStatus
+{
+    std::vector<Card> cards;
+    std::list<Job> queue;
+    bool maintenance = false;
+};
+
 struct StatusRequest
 {
 };
 struct StatusResponse
 {
     std::vector<Card> cards;
-    std::vector<Job> jobsInQueue;
-    bool maintenance;
+    std::vector<Job> queue;
+    bool maintenance = false;
 };
 
 struct ClaimRequest

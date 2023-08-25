@@ -22,9 +22,14 @@ using namespace std::chrono_literals;
 class Connection
 {
 public:
+    class Error : public std::runtime_error
+    {
+        using std::runtime_error::runtime_error;
+    };
+
     Connection()
     {
-        m_fd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
+        m_fd = socket(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0);
         if(m_fd < 0)
         {
             fprintf(stderr, "Could not connect to gpu_server. Please contact the system administrators.\n");
@@ -57,9 +62,10 @@ public:
 
         if(::send(m_fd, data.data(), data.size(), MSG_EOR) != data.size())
         {
-            perror("Could not send data to gpu_server");
-            fprintf(stderr, "Please contact the system adminstrator.\n");
-            std::exit(1);
+            std::stringstream ss;
+            ss << "Could not send data to gpu_server: " << strerror(errno) << "\n";
+            ss << "Please contact the system administrator.\n";
+            throw Error{ss.str()};
         }
     }
 
@@ -271,11 +277,11 @@ int main(int argc, char** argv)
             printf("\n");
         }
 
-        if(!resp.jobsInQueue.empty())
+        if(!resp.queue.empty())
         {
             printf("\n");
             printf("Waiting jobs:\n");
-            for(auto& job : resp.jobsInQueue)
+            for(auto& job : resp.queue)
             {
                 struct passwd *pws;
                 pws = getpwuid(job.uid);
@@ -318,10 +324,10 @@ int main(int argc, char** argv)
 
         std::uint32_t nGPUs = vm["num-cards"].as<unsigned int>();
 
+        Connection conn;
+
         ClaimResponse resp;
         {
-            Connection conn;
-
             Request req{ClaimRequest{nGPUs, true}};
             conn.send(req);
 
@@ -439,9 +445,8 @@ int main(int argc, char** argv)
             usleep(200 * 1000);
         }
 
+        try
         {
-            Connection conn;
-
             ReleaseRequest params;
             for(auto& card : resp.claimedCards)
                 params.gpus.push_back(card.index);
@@ -457,6 +462,11 @@ int main(int argc, char** argv)
                 fprintf(stderr, "Could not release GPUs:\n%s\n", resp.errors.c_str());
                 return 1;
             }
+        }
+        catch(Connection::Error& e)
+        {
+            fprintf(stderr, "Could not release GPUs. Probably there was a 'gpu' update in the meantime. This is not a problem.\n");
+            return 0;
         }
     }
     else
