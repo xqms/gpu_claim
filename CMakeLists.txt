@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 project(gpu_claim)
 
 set(VERSION_MAJOR 0)
-set(VERSION_MINOR 8)
+set(VERSION_MINOR 9)
 set(VERSION_PATCH 0)
 
 set(CMAKE_CXX_FLAGS "-std=c++20")
