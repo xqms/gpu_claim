@@ -246,9 +246,9 @@ int main(int argc, char** argv)
             if(card.reservedByUID == 0)
             {
                 if(card.processes.empty())
-                    printf("%27s │", "free");
+                    printf("%28s │", "free");
                 else
-                    printf("%27s │", "waiting for exit");
+                    printf("%28s │", "waiting for exit");
             }
             else
             {
@@ -260,9 +260,9 @@ int main(int argc, char** argv)
                 });
 
                 if(used)
-                    printf("%15s   (running) │", pws ? pws->pw_name : "unknown");
+                    printf("%15s    (running) │", pws ? pws->pw_name : "unknown");
                 else
-                    printf("%15s (idle %ldsec) │", pws ? pws->pw_name : "unknown", seconds.count());
+                    printf("%15s (idle %2ldsec) │", pws ? pws->pw_name : "unknown", seconds.count());
             }
 
             for(auto& proc : card.processes)
