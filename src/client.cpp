@@ -159,6 +159,7 @@ int main(int argc, char** argv)
         ("help,h", "Help")
         ("version,v", "Display version")
         ("num-cards,n", po::value<unsigned int>()->default_value(1)->value_name("N"), "Number of GPUs to claim")
+        ("card,c", po::value<std::vector<std::uint32_t>>(), "Specific card(s) to run on. These must already belong to you (you are running another job on them)")
         ("no-isolation", "Disable device isolation")
     ;
 
@@ -197,8 +198,14 @@ int main(int argc, char** argv)
             "Available commands:\n"
             "  gpu status:\n"
             "    List current GPU allocation & status\n"
-            "  gpu run [options] <cmd>:\n"
-            "    Run cmd one or more GPUs. Use gpu -nX <cmd> run to use multiple GPUs.\n"
+            "  gpu [options] run <cmd>:\n"
+            "    Run cmd one or more GPUs.\n"
+            "    Single GPU:\n"
+            "      gpu run <cmd>\n"
+            "    Multi-GPU (replace 2 by number of GPUs):\n"
+            "      gpu -n 2 run <cmd>\n"
+            "    Run on the same GPU as another command you are already running on GPU 3:\n"
+            "      gpu --card 3 run <cmd>\n"
             "\n"
             "Available options:\n"
         );
@@ -267,11 +274,8 @@ int main(int argc, char** argv)
 
             for(auto& proc : card.processes)
             {
-                struct passwd *pws;
-                pws = getpwuid(proc.uid);
-
-                printf(" %s(PID %d, %luM)",
-                    pws->pw_name, proc.pid, proc.memory / 1000000UL
+                printf(" %d(%luM)",
+                    proc.pid, proc.memory / 1000000UL
                 );
             }
             printf("\n");
@@ -327,6 +331,7 @@ int main(int argc, char** argv)
         Connection conn;
 
         ClaimResponse resp;
+        if(vm.count("card") == 0)
         {
             Request req{ClaimRequest{nGPUs, true}};
             conn.send(req);
@@ -348,6 +353,20 @@ int main(int argc, char** argv)
 
             if(hadToWait)
                 printf("gpu: Success! Starting user command.\n");
+        }
+        else
+        {
+            std::vector<std::uint32_t> specificGPUs = vm["card"].as<std::vector<std::uint32_t>>();
+            Request req{CoRunRequest{specificGPUs}};
+            conn.send(req);
+
+            conn.receive(resp);
+
+            if(resp.claimedCards.empty())
+            {
+                fprintf(stderr, "Could not claim GPUs: %s\n", resp.error.c_str());
+                return 1;
+            }
         }
 
         std::stringstream ss;

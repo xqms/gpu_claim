@@ -84,6 +84,36 @@ Client::Action Client::communicate(const ServerStatus& serverStatus)
             job.submissionTime = std::chrono::system_clock::now();
             return EnqueueJob{std::move(job)};
         },
+        [&](const CoRunRequest& req) -> Action {
+            for(auto& cardIdx : req.gpus)
+            {
+                if(cardIdx >= serverStatus.cards.size())
+                {
+                    ClaimResponse resp;
+                    resp.error = "Invalid GPU number";
+                    send(resp);
+                    return Delete{};
+                }
+
+                auto& card = serverStatus.cards[cardIdx];
+                if(card.reservedByUID != uid)
+                {
+                    ClaimResponse resp;
+                    std::stringstream ss;
+                    ss << "Card " << cardIdx << " is not reserved by you";
+                    resp.error = ss.str();
+                    send(resp);
+                    return Delete{};
+                }
+            }
+
+            ClaimResponse resp;
+            for(auto c : req.gpus)
+                resp.claimedCards.push_back(serverStatus.cards[c]);
+            send(resp);
+
+            return CoRunCards{req.gpus};
+        },
         [&](const ReleaseRequest& req) -> Action {
             std::stringstream errors;
             ReleaseCards action;
@@ -103,20 +133,25 @@ Client::Action Client::communicate(const ServerStatus& serverStatus)
                     errors << "Card " << cardIdx << " is not reserved by user\n";
                     continue;
                 }
-                if(card.reservedByClientPID != pid)
+
+                auto cit = std::ranges::find(card.clientPIDs, pid);
+                if(cit == card.clientPIDs.end())
                 {
-                    errors << "Card" << cardIdx << " is not reserved by your PID\n";
+                    errors << "Card " << cardIdx << " is not reserved by your PID\n";
                     continue;
                 }
 
-                auto it = std::ranges::find_if(card.processes, [&](const auto& proc){
-                    return proc.uid == uid;
-                });
-
-                if(it != card.processes.end())
+                if(card.clientPIDs.size() == 1)
                 {
-                    errors << "Card " << cardIdx << " is still in use. Maybe you want to kill the process with PID " << it->pid << "?\n";
-                    continue;
+                    auto it = std::ranges::find_if(card.processes, [&](const auto& proc){
+                        return proc.uid == uid;
+                    });
+
+                    if(it != card.processes.end())
+                    {
+                        errors << "Card " << cardIdx << " is still in use. Maybe you want to kill the process with PID " << it->pid << "?\n";
+                        continue;
+                    }
                 }
 
                 action.cards.push_back(card.index);

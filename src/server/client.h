@@ -37,12 +37,16 @@ struct Client
     {
         Job job;
     };
+    struct CoRunCards
+    {
+        std::vector<std::uint32_t> cards;
+    };
     struct ReleaseCards
     {
         std::vector<int> cards;
     };
 
-    using Action = std::variant<Keep, Delete, EnqueueJob, ReleaseCards>;
+    using Action = std::variant<Keep, Delete, EnqueueJob, CoRunCards, ReleaseCards>;
 
     // Return false if the client should be deleted
     [[nodiscard]] Action communicate(const ServerStatus& serverStatus);

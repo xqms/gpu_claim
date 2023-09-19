@@ -33,7 +33,7 @@ struct Card
     std::uint16_t temperatureCelsius = 0;
 
     int reservedByUID = 0;
-    int reservedByClientPID = -1;
+    std::vector<int> clientPIDs;
     std::vector<Process> processes;
 
     std::chrono::steady_clock::time_point lastUsageTime;
@@ -66,10 +66,16 @@ struct StatusResponse
     bool maintenance = false;
 };
 
+// Give me any N GPUs
 struct ClaimRequest
 {
     std::uint32_t numGPUs = 0;
     bool wait = false;
+};
+// Let me run on these specific GPUs, which I already own.
+struct CoRunRequest
+{
+    std::vector<std::uint32_t> gpus;
 };
 struct ClaimResponse
 {
@@ -86,7 +92,7 @@ struct ReleaseResponse
     std::string errors;
 };
 
-using Request = std::variant<StatusRequest, ClaimRequest, ReleaseRequest>;
+using Request = std::variant<StatusRequest, ClaimRequest, CoRunRequest, ReleaseRequest>;
 
 namespace std
 {

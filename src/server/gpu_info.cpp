@@ -198,23 +198,23 @@ void update(Card& card, const std::chrono::steady_clock::time_point& now)
 
     for(unsigned int i = 0; i < procCount; ++i)
     {
-        auto it = std::find_if(card.processes.begin(), card.processes.end(), [&](auto& proc){
+        auto it = std::ranges::find_if(card.processes, [&](auto& proc){
             return proc.pid == processBuf[i].pid;
         });
 
         if(it == card.processes.end())
-            it = card.processes.insert(it, {});
+            it = card.processes.insert(it, Process{});
 
-        auto& proc = card.processes.emplace_back();
+        auto& proc = *it;
         proc.pid = processBuf[i].pid;
-        proc.memory += processBuf[i].usedGpuMemory;
+        proc.memory = processBuf[i].usedGpuMemory;
 
         snprintf(buf, sizeof(buf), "/proc/%u", proc.pid);
         struct stat st{};
         if(stat(buf, &st) != 0)
         {
             fprintf(stderr, "Could not stat %s: %s\n", buf, strerror(errno));
-            card.processes.pop_back();
+            card.processes.erase(it);
             continue;
         }
 

@@ -89,7 +89,7 @@ void claim(Card& card, int uid, int gid=65534, int pid=-1)
         std::exit(1);
     }
     card.reservedByUID = uid;
-    card.reservedByClientPID = pid;
+    card.clientPIDs = {pid};
     card.lastUsageTime = std::chrono::steady_clock::now();
 
     if(uid == 0)
@@ -111,6 +111,12 @@ void release(Card& card)
     claim(card, 0, 0);
 }
 
+void releaseFromClient(Card& card, int clientPID)
+{
+    std::erase(card.clientPIDs, clientPID);
+    if(card.processes.empty() && card.clientPIDs.empty())
+        release(card);
+}
 
 
 void periodicUpdate()
@@ -122,14 +128,21 @@ void periodicUpdate()
 
         gpu_info::update(card, now);
 
-        if(card.processes.empty() && card.reservedByClientPID != -1)
+        if(card.processes.empty() && !card.clientPIDs.empty())
         {
-            // Is our client still alive?
-            if(kill(card.reservedByClientPID, 0) != 0)
+            std::vector<int> erasePIDs;
+            for(auto clientPID : card.clientPIDs)
             {
-                printf("Returning card %u, client with PID %d is not alive anymore\n", devIdx, card.reservedByClientPID);
-                release(card);
+                // Is our client still alive?
+                if(kill(clientPID, 0) != 0)
+                {
+                    printf("Returning card %u, client with PID %d is not alive anymore\n", devIdx, clientPID);
+                    erasePIDs.push_back(clientPID);
+                }
             }
+
+            for(auto pid : erasePIDs)
+                releaseFromClient(card, pid);
         }
 
         using namespace std::chrono_literals;
@@ -369,9 +382,18 @@ int main(int argc, char** argv)
                         g_status.queue.push_back(ac.job);
                         periodicUpdate();
                     },
-                    [&](const Client::ReleaseCards& ac) {
+                    [&](const Client::CoRunCards& ac) {
                         for(auto& cardIdx : ac.cards)
-                            release(g_status.cards[cardIdx]);
+                        {
+                            g_status.cards[cardIdx].clientPIDs.push_back(client->pid);
+                        }
+                    },
+                    [&](const Client::ReleaseCards& ac) {
+                        periodicUpdate();
+                        for(auto& cardIdx : ac.cards)
+                        {
+                            releaseFromClient(g_status.cards[cardIdx], client->pid);
+                        }
                     }
                 }, action);
             }
@@ -400,10 +422,10 @@ int main(int argc, char** argv)
 
             for(auto& card : g_status.cards)
             {
-                if(card.reservedByClientPID == client->pid)
+                if(std::ranges::find(card.clientPIDs, client->pid) != card.clientPIDs.end())
                 {
                     printf("Releasing card %d, client with PID %d disconnected\n", card.index, client->pid);
-                    release(card);
+                    releaseFromClient(card, client->pid);
                 }
             }
 
