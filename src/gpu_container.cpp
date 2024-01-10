@@ -13,8 +13,10 @@
 #include <unistd.h>
 #include <string.h>
 
+#include <map>
 #include <vector>
 #include <string>
+#include <sstream>
 
 void usage()
 {
@@ -25,6 +27,73 @@ void usage()
 
 pid_t childProcessPID = 0;
 pid_t userProcessPID = 0;
+
+std::map<std::string, std::string> readProcessEnvironment(pid_t pid)
+{
+    char buf[256];
+    snprintf(buf, sizeof(buf), "/proc/%d/environ", pid);
+    int fd = open(buf, O_RDONLY);
+    if(fd < 0)
+    {
+        perror("Could not open parent process environment");
+        return {};
+    }
+
+    enum class State
+    {
+        Key,
+        Value
+    };
+    State state = State::Key;
+
+    std::stringstream currentKey;
+    std::stringstream currentValue;
+    std::map<std::string, std::string> data;
+
+    while(true)
+    {
+        int ret = read(fd, buf, sizeof(buf));
+        if(ret < 0)
+        {
+            perror("Could not read from parent process environment");
+            close(fd);
+            return {};
+        }
+        if(ret == 0)
+            break;
+
+        for(int i = 0; i < ret; ++i)
+        {
+            char c = buf[i];
+
+            switch(state)
+            {
+                case State::Key:
+                    if(c == '=')
+                        state = State::Value;
+                    else
+                        currentKey << c;
+                    break;
+                case State::Value:
+                    if(c == 0)
+                    {
+                        if(!currentKey.str().empty())
+                            data[currentKey.str()] = currentValue.str();
+
+                        currentKey = {};
+                        currentValue = {};
+                        state = State::Key;
+                    }
+                    else
+                        currentValue << c;
+                    break;
+            }
+        }
+    }
+
+    close(fd);
+    return data;
+}
 
 int main(int argc, char** argv)
 {
@@ -57,6 +126,13 @@ int main(int argc, char** argv)
 
     // Request that we get a SIGTERM whenever the parent process dies
     prctl(PR_SET_PDEATHSIG, SIGTERM);
+
+    // ld.so strips useful environment variables like LD_LIBRARY_PATH
+    // from the environment of a setuid executable (which we are).
+    // So we read the environment of the parent process and restore it in our child.
+    // This is not a security problem since our child has the same capabilities
+    // as our parent (it's just this process that's elevated).
+    auto parentEnv = readProcessEnvironment(getppid());
 
     // Let's go!
     if(unshare(CLONE_NEWNS | CLONE_NEWPID) != 0)
@@ -160,6 +236,16 @@ int main(int argc, char** argv)
         if(userProcessPID == 0)
         {
             // Child process, will become the user application
+
+            // Load variables from parent process environment if they are not already present
+            for(auto& entry : parentEnv)
+            {
+                if(getenv(entry.first.c_str()))
+                    continue;
+
+                setenv(entry.first.c_str(), entry.second.c_str(), 1);
+            }
+
             if(execvp(argv[sepIdx + 1], argv + sepIdx + 1) != 0)
             {
                 perror("Could not execvp");
