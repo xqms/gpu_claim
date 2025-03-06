@@ -8,7 +8,7 @@ permissions:
   id-token: write
 
 env:
-  REPO_NAME: gpu_claim
+  REPO_NAME: gpu-claim
   CODENAME: all
   COMPONENTS: main
   ARCHITECTURES: amd64
