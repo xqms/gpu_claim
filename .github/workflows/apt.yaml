@@ -22,7 +22,9 @@ jobs:
         run: |
           mkdir apt
           cd apt
-          for release in $(gh release list --json name --jq '.[].tagName'); do
+          releases=$(gh release list --json tagName --jq '.[].tagName')
+          echo "List of releases: $releases"
+          for release in $releases; do
             gh release download $release --pattern '*.deb';
           done
           ls -la
