@@ -1,0 +1,60 @@
+name: "Build APT repo"
+
+on: [release, workflow_dispatch]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+env:
+  REPO_NAME: gpu_claim
+  CODENAME: all
+  COMPONENTS: main
+  ARCHITECTURES: amd64
+
+jobs:
+  apt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Download .deb files from releases"
+        run: |
+          mkdir apt
+          cd apt
+          for release in $(gh release list --json name --jq '.[].tagName'); do
+            gh release download $release --pattern '*.deb';
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: morph027/apt-repo-action@v2
+        id: create-apt-repo
+        with:
+          repo-name: ${{ env.REPO_NAME }}
+          signing-key: ${{ secrets.SIGNING_KEY }}
+          codename: ${{ env.CODENAME }}
+          components: ${{ env.COMPONENTS }}
+          architectures: ${{ env.ARCHITECTURES }}
+          scan-dir: apt
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: github-pages
+          path: ${{ steps.create-apt-repo.outputs.dir }}
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Adding summary
+        run: |
+          echo ':rocket:' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo 'curl -sfLo /etc/apt.trusted.gpg.d/${{ needs.build.outputs.keyring }}.asc ${{ steps.deploy-pages.outputs.page_url }}gpg.key' >> $GITHUB_STEP_SUMMARY
+          echo 'echo "deb ${{ steps.deploy-pages.outputs.page_url }} ${{ env.CODENAME }} ${{ env.COMPONENTS }}" >/etc/apt/sources.list.d/${{ env.REPO_NAME }}.list' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
