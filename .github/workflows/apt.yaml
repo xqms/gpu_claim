@@ -25,7 +25,7 @@ jobs:
           releases=$(gh release list --json tagName --jq '.[].tagName')
           echo "List of releases: $releases"
           for release in $releases; do
-            gh release download $release --pattern 'gpu-claim*.deb';
+            gh release download $release --pattern 'gpu-claim*.deb' || true;
           done
           ls -la
         env:
