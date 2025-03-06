@@ -1,6 +1,9 @@
 name: "Build APT repo"
 
-on: [release, workflow_dispatch]
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: read
