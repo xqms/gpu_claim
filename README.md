@@ -77,7 +77,18 @@ Type "help", "copyright", "credits" or "license" for more information.
 Admin HowTo
 -----------
 
-Debian packages are available on the GitHub releases page.
+Installation on Debian/Ubuntu:
+```
+# Repo setup
+sudo mkdir -p /etc/apt/keyrings
+curl -sL https://xqms.github.io/gpu_claim/gpg.key | sudo tee /etc/apt/keyrings/gpu-claim-keyring.asc > /dev/null
+echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/gpu-claim-keyring.asc] https://xqms.github.io/gpu_claim/ all main" | sudo tee /etc/apt/sources.list.d/gpu-claim.list > /dev/null
+
+# Installation
+sudo apt update && sudo apt install gpu-claim
+```
+
+Debian package files are also available on the GitHub releases page for manual installation.
 
 The server features a maintenance mode, which blocks accepting new jobs
 and displays an appropriate message to the user. You can switch to

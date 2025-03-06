@@ -63,6 +63,7 @@ jobs:
           echo ':rocket:' >> $GITHUB_STEP_SUMMARY
           echo '' >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo 'curl -sfLo /etc/apt.trusted.gpg.d/${{ needs.apt.outputs.keyring }}.asc ${{ steps.deployment.outputs.page_url }}gpg.key' >> $GITHUB_STEP_SUMMARY
-          echo 'echo "deb ${{ steps.deployment.outputs.page_url }} ${{ env.CODENAME }} ${{ env.COMPONENTS }}" >/etc/apt/sources.list.d/${{ env.REPO_NAME }}.list' >> $GITHUB_STEP_SUMMARY
+          echo 'sudo mkdir -p /etc/apt/keyrings' >> $GITHUB_STEP_SUMMARY
+          echo 'curl -sL ${{ steps.deployment.outputs.page_url }}gpg.key | sudo tee /etc/apt/keyrings/${{ needs.apt.outputs.keyring }}.asc > /dev/null' >> $GITHUB_STEP_SUMMARY
+          echo 'echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/${{ needs.apt.outputs.keyring }}.asc] ${{ steps.deployment.outputs.page_url }} ${{ env.CODENAME }} ${{ env.COMPONENTS }}" | sudo tee /etc/apt/sources.list.d/${{ env.REPO_NAME }}.list > /dev/null' >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
