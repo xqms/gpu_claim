@@ -18,6 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: "Download .deb files from releases"
+        shell: bash
         run: |
           mkdir apt
           cd apt
@@ -26,6 +27,7 @@ jobs:
           done
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
       - uses: morph027/apt-repo-action@v2
         id: create-apt-repo
         with:
