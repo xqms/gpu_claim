@@ -4,7 +4,7 @@ project(gpu_claim)
 
 set(VERSION_MAJOR 0)
 set(VERSION_MINOR 10)
-set(VERSION_PATCH 3)
+set(VERSION_PATCH 4)
 
 set(CMAKE_CXX_FLAGS "-std=c++20")
 add_definitions(
