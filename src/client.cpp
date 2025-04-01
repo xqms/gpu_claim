@@ -476,6 +476,16 @@ int main(int argc, char** argv)
             ReleaseResponse resp;
             conn.receive(resp);
 
+            if(resp.errors.empty())
+                return 0;
+
+            // Failure, wait a little bit more and try again
+            sleep(1);
+
+            conn.send(req);
+            resp = {};
+            conn.receive(resp);
+
             if(!resp.errors.empty())
             {
                 fprintf(stderr, "Could not release GPUs:\n%s\n", resp.errors.c_str());
